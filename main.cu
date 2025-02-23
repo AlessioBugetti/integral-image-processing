@@ -103,8 +103,8 @@ CudaIntegralImage(const unsigned int* hostInput,
                                                   blockCounter);
     }
 
-    block = dim3(BLOCK_DIM, BLOCK_DIM);
-    grid = dim3((width + BLOCK_DIM - 1) / BLOCK_DIM, (height + BLOCK_DIM - 1) / BLOCK_DIM);
+    block = dim3(TILE_DIM, BLOCK_ROWS);
+    grid = dim3((width + TILE_DIM - 1) / TILE_DIM, (height + TILE_DIM - 1) / TILE_DIM);
 
     Transpose<<<grid, block>>>(deviceOutput, deviceInput, height, width);
 
@@ -131,8 +131,8 @@ CudaIntegralImage(const unsigned int* hostInput,
                                                   blockCounter);
     }
 
-    block = dim3(BLOCK_DIM, BLOCK_DIM);
-    grid = dim3((height + BLOCK_DIM - 1) / BLOCK_DIM, (width + BLOCK_DIM - 1) / BLOCK_DIM);
+    block = dim3(TILE_DIM, BLOCK_ROWS);
+    grid = dim3((height + TILE_DIM - 1) / TILE_DIM, (width + TILE_DIM - 1) / TILE_DIM);
 
     Transpose<<<grid, block>>>(deviceOutput, deviceInput, width, height);
 
@@ -158,19 +158,6 @@ GenerateRandomGrayscaleImage(const unsigned int width, const unsigned int height
     }
 
     return output;
-}
-
-void
-PrintImage(const unsigned int* input, const unsigned int width, const unsigned int height)
-{
-    for (int y = 0; y < height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            std::cout << input[y * width + x] << " ";
-        }
-        std::cout << std::endl;
-    }
 }
 
 int

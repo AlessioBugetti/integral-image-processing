@@ -1,4 +1,5 @@
-#define BLOCK_DIM 32
+#define TILE_DIM 32
+#define BLOCK_ROWS 8
 #define SECTION_SIZE 1024
 
 __global__ void
@@ -52,7 +53,6 @@ SinglePassKoggeStoneScan(const unsigned int* input,
     {
         while (bid >= 1 && atomicAdd(&flags[bid], 0) == 0)
         {
-            // Attende i dati
         }
         previousSum = scanValue[bid];
         scanValue[bid + 1] = XY[blockDim.x - 1] + previousSum;
@@ -73,23 +73,50 @@ Transpose(const unsigned int* input,
           const unsigned int height,
           const unsigned int width)
 {
-    __shared__ float block[BLOCK_DIM][BLOCK_DIM + 1];
+    __shared__ unsigned int tile[TILE_DIM][TILE_DIM + 1];
+    unsigned int blockIdx_x, blockIdx_y;
 
-    unsigned int xIndex = blockIdx.x * BLOCK_DIM + threadIdx.x;
-    unsigned int yIndex = blockIdx.y * BLOCK_DIM + threadIdx.y;
-    if ((xIndex < width) && (yIndex < height))
+    if (width == height)
     {
-        const unsigned int index_in = yIndex * width + xIndex;
-        block[threadIdx.y][threadIdx.x] = input[index_in];
+        blockIdx_y = blockIdx.x;
+        blockIdx_x = (blockIdx.x + blockIdx.y) % gridDim.x;
+    }
+    else
+    {
+        const unsigned bid = blockIdx.x + gridDim.x * blockIdx.y;
+        blockIdx_y = bid % gridDim.y;
+        blockIdx_x = ((bid / gridDim.y) + blockIdx_y) % gridDim.x;
+    }
+
+    const unsigned int xIndexIn = blockIdx_x * TILE_DIM + threadIdx.x;
+    const unsigned int yIndexIn = blockIdx_y * TILE_DIM + threadIdx.y;
+
+    if (xIndexIn < width && yIndexIn < height)
+    {
+        const unsigned int index_in = xIndexIn + (yIndexIn * width);
+        for (unsigned int i = 0; i < TILE_DIM; i += BLOCK_ROWS)
+        {
+            if (yIndexIn + i < height)
+            {
+                tile[threadIdx.y + i][threadIdx.x] = input[index_in + i * width];
+            }
+        }
     }
 
     __syncthreads();
 
-    xIndex = blockIdx.y * BLOCK_DIM + threadIdx.x;
-    yIndex = blockIdx.x * BLOCK_DIM + threadIdx.y;
-    if ((xIndex < height) && (yIndex < width))
+    const unsigned int xIndexOut = blockIdx_y * TILE_DIM + threadIdx.x;
+    const unsigned int yIndexOut = blockIdx_x * TILE_DIM + threadIdx.y;
+
+    if (xIndexOut < height && yIndexOut < width)
     {
-        const unsigned int index_out = yIndex * height + xIndex;
-        output[index_out] = block[threadIdx.x][threadIdx.y];
+        for (unsigned int i = 0; i < TILE_DIM; i += BLOCK_ROWS)
+        {
+            if (xIndexOut < height && threadIdx.y + i < TILE_DIM)
+            {
+                const unsigned int index_out = xIndexOut + (yIndexOut * height);
+                output[index_out + i * height] = tile[threadIdx.x][threadIdx.y + i];
+            }
+        }
     }
 }
