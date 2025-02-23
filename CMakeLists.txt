@@ -1,6 +1,9 @@
-cmake_minimum_required(VERSION 3.30)
-project(integral_image_prova)
+cmake_minimum_required(VERSION 3.13)
+project(integral_image LANGUAGES CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(integral_image_prova main.cpp)
+find_package(CUDAToolkit REQUIRED)
+set(CUDA_ARCHITECTURES 86)
+
+add_executable(integral_image main.cu)
