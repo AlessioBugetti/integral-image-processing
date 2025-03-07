@@ -9,8 +9,11 @@ BLOCK_ROWS = 8
 TILE_DIM_2 = TILE_DIM + 1
 NUM_ITERATIONS = 1000
 
+
 @cuda.jit
-def single_pass_row_wise_scan(input, output, flags, scan_value, block_counter, num_rows, num_cols):
+def single_pass_row_wise_scan(
+        input, output, flags, scan_value, block_counter, num_rows, num_cols
+):
     XY = cuda.shared.array(SECTION_SIZE, dtype=types.uint32)
     bid_s = cuda.shared.array(1, dtype=types.uint32)
 
@@ -56,6 +59,7 @@ def single_pass_row_wise_scan(input, output, flags, scan_value, block_counter, n
     if row < num_rows and col < num_cols:
         output[pixel] = XY[cuda.threadIdx.x] + previous_sum[0]
 
+
 @cuda.jit
 def transpose(input, output, height, width):
     tile = cuda.shared.array((TILE_DIM, TILE_DIM_2), dtype=types.uint32)
@@ -76,7 +80,9 @@ def transpose(input, output, height, width):
         i = 0
         while i < TILE_DIM:
             if yIndexIn + i < height:
-                tile[cuda.threadIdx.y + i][cuda.threadIdx.x] = input[index_in + i * width]
+                tile[cuda.threadIdx.y + i][cuda.threadIdx.x] = input[
+                    index_in + i * width
+                    ]
             i += BLOCK_ROWS
 
     cuda.syncthreads()
@@ -89,8 +95,11 @@ def transpose(input, output, height, width):
         while i < TILE_DIM:
             if xIndexOut < height and cuda.threadIdx.y + i < TILE_DIM:
                 index_out = xIndexOut + (yIndexOut * height)
-                output[index_out + i * height] = tile[cuda.threadIdx.x][cuda.threadIdx.y + i]
+                output[index_out + i * height] = tile[cuda.threadIdx.x][
+                    cuda.threadIdx.y + i
+                    ]
             i += BLOCK_ROWS
+
 
 def numba_integral_image(host_input, width, height):
     pixel_count = width * height
@@ -123,16 +132,38 @@ def numba_integral_image(host_input, width, height):
     block_scan = (SECTION_SIZE, 1, 1)
     grid_transposed_scan = (num_blocks_per_row_transposed, width, 1)
     block_transpose = (TILE_DIM, BLOCK_ROWS, 1)
-    grid_transpose = ((width + TILE_DIM - 1) // TILE_DIM, (height + TILE_DIM - 1) // TILE_DIM, 1)
-    grid_transposed_transpose = ((height + TILE_DIM - 1) // TILE_DIM, (width + TILE_DIM - 1) // TILE_DIM, 1)
+    grid_transpose = (
+        (width + TILE_DIM - 1) // TILE_DIM,
+        (height + TILE_DIM - 1) // TILE_DIM,
+        1,
+    )
+    grid_transposed_transpose = (
+        (height + TILE_DIM - 1) // TILE_DIM,
+        (width + TILE_DIM - 1) // TILE_DIM,
+        1,
+    )
 
     cuda.synchronize()
     start = time.perf_counter_ns()
 
-    single_pass_row_wise_scan[grid_scan, block_scan](device_input, device_output, flags, S, block_counter, height, width)
-    transpose[grid_transpose, block_transpose](device_output, device_input, height, width)
-    single_pass_row_wise_scan[grid_transposed_scan, block_scan](device_input, device_output, transposed_flags, transposed_S, transposed_block_counter, width, height)
-    transpose[grid_transposed_transpose, block_transpose](device_output, device_input, width, height)
+    single_pass_row_wise_scan[grid_scan, block_scan](
+        device_input, device_output, flags, S, block_counter, height, width
+    )
+    transpose[grid_transpose, block_transpose](
+        device_output, device_input, height, width
+    )
+    single_pass_row_wise_scan[grid_transposed_scan, block_scan](
+        device_input,
+        device_output,
+        transposed_flags,
+        transposed_S,
+        transposed_block_counter,
+        width,
+        height,
+    )
+    transpose[grid_transposed_transpose, block_transpose](
+        device_output, device_input, width, height
+    )
 
     cuda.synchronize()
     stop = time.perf_counter_ns()
@@ -141,13 +172,16 @@ def numba_integral_image(host_input, width, height):
 
     return host_output, (stop - start) / 1000000
 
+
 if __name__ == "__main__":
     np.random.seed(42)
     sizes = [1024, 2048, 4096, 8192]
 
     height_warmup = 1024
     width_warmup = 1024
-    hostInput = np.random.randint(0, 256, size=height_warmup * width_warmup, dtype=np.uint32)
+    hostInput = np.random.randint(
+        0, 256, size=height_warmup * width_warmup, dtype=np.uint32
+    )
 
     # Warm-up
     for _ in range(10):

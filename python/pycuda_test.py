@@ -135,6 +135,7 @@ mod = SourceModule(kernel_code)
 SinglePassRowWiseScan = mod.get_function("SinglePassRowWiseScan")
 Transpose = mod.get_function("Transpose")
 
+
 def pycuda_integral_image(hostInput, width, height):
     pixelCount = width * height
     hostOutput = np.zeros(pixelCount, dtype=np.uint32)
@@ -168,16 +169,58 @@ def pycuda_integral_image(hostInput, width, height):
     blockScan = (SECTION_SIZE, 1, 1)
     gridTransposedScan = (numBlocksPerRowTransposed, width, 1)
     blockTranpose = (TILE_DIM, BLOCK_ROWS, 1)
-    gridTranspose = ((width + TILE_DIM -1) // TILE_DIM, (height + TILE_DIM -1) // TILE_DIM, 1)
-    gridTransposedTranspose = ((height + TILE_DIM -1) // TILE_DIM, (width + TILE_DIM -1) // TILE_DIM, 1)
+    gridTranspose = (
+        (width + TILE_DIM - 1) // TILE_DIM,
+        (height + TILE_DIM - 1) // TILE_DIM,
+        1,
+    )
+    gridTransposedTranspose = (
+        (height + TILE_DIM - 1) // TILE_DIM,
+        (width + TILE_DIM - 1) // TILE_DIM,
+        1,
+    )
 
     cuda.Context.synchronize()
     start = time.perf_counter_ns()
 
-    SinglePassRowWiseScan(deviceInput, deviceOutput, flags, S, blockCounter, np.uint32(height), np.uint32(width), block=blockScan, grid=gridScan)
-    Transpose(deviceOutput, deviceInput, np.uint32(height), np.uint32(width), block=blockTranpose, grid=gridTranspose)
-    SinglePassRowWiseScan(deviceInput, deviceOutput, transposedFlags, transposedS, transposedBlockCounter, np.uint32(width), np.uint32(height), block=blockScan, grid=gridTransposedScan)
-    Transpose(deviceOutput, deviceInput, np.uint32(width), np.uint32(height), block=blockTranpose, grid=gridTransposedTranspose)
+    SinglePassRowWiseScan(
+        deviceInput,
+        deviceOutput,
+        flags,
+        S,
+        blockCounter,
+        np.uint32(height),
+        np.uint32(width),
+        block=blockScan,
+        grid=gridScan,
+    )
+    Transpose(
+        deviceOutput,
+        deviceInput,
+        np.uint32(height),
+        np.uint32(width),
+        block=blockTranpose,
+        grid=gridTranspose,
+    )
+    SinglePassRowWiseScan(
+        deviceInput,
+        deviceOutput,
+        transposedFlags,
+        transposedS,
+        transposedBlockCounter,
+        np.uint32(width),
+        np.uint32(height),
+        block=blockScan,
+        grid=gridTransposedScan,
+    )
+    Transpose(
+        deviceOutput,
+        deviceInput,
+        np.uint32(width),
+        np.uint32(height),
+        block=blockTranpose,
+        grid=gridTransposedTranspose,
+    )
 
     cuda.Context.synchronize()
     stop = time.perf_counter_ns()
@@ -193,7 +236,8 @@ def pycuda_integral_image(hostInput, width, height):
     transposedFlags.free()
     transposedBlockCounter.free()
 
-    return hostOutput, (stop - start)/1000000
+    return hostOutput, (stop - start) / 1000000
+
 
 if __name__ == "__main__":
     np.random.seed(42)
@@ -201,7 +245,9 @@ if __name__ == "__main__":
 
     height_warmup = 1024
     width_warmup = 1024
-    hostInput = np.random.randint(0, 256, size=height_warmup*width_warmup, dtype=np.uint32)
+    hostInput = np.random.randint(
+        0, 256, size=height_warmup * width_warmup, dtype=np.uint32
+    )
 
     # Warm-up
     for _ in range(10):
