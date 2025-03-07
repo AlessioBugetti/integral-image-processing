@@ -13,7 +13,6 @@
 - [Cuda Kernels](#cuda-kernels)
     - [Included Kernels](#included-kernels)
 - [Performance](#performance)
-- [Credits](#credits)
 - [License](#license)
 - [Author](#author)
 
