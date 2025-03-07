@@ -1,3 +1,9 @@
+#
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Author: Alessio Bugetti <alessiobugetti98@gmail.com>
+#
+
 import numpy as np
 from numba import cuda, types
 import time

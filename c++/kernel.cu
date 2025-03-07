@@ -1,3 +1,9 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * Author: Alessio Bugetti <alessiobugetti98@gmail.com>
+ */
+
 #define TILE_DIM 32
 #define BLOCK_ROWS 8
 #define SECTION_SIZE 256
