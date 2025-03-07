@@ -1,17 +1,32 @@
 #define TILE_DIM 32
 #define BLOCK_ROWS 8
-#define SECTION_SIZE 1024
+#define SECTION_SIZE 256
 
 __global__ void
-SinglePassKoggeStoneScan(const unsigned int* input,
-                         unsigned int* output,
-                         const unsigned int length,
-                         unsigned int* flags,
-                         unsigned int* scanValue,
-                         unsigned int* blockCounter)
+SumRows(unsigned int* input, const unsigned int height, const unsigned int width)
 {
-    __shared__ unsigned int bid_s;
+    const unsigned int tid = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (tid < height)
+    {
+        for (int j = 1; j < width; j++)
+        {
+            input[tid * width + j] += input[tid * width + (j - 1)];
+        }
+    }
+}
+
+__global__ void
+SinglePassRowWiseScan(const unsigned int* input,
+                      unsigned int* output,
+                      unsigned int* flags,
+                      unsigned int* scanValue,
+                      unsigned int* blockCounter,
+                      const unsigned int numRows,
+                      const unsigned int numCols)
+{
     __shared__ unsigned int XY[SECTION_SIZE];
+    __shared__ unsigned int bid_s;
 
     if (threadIdx.x == 0)
     {
@@ -19,12 +34,17 @@ SinglePassKoggeStoneScan(const unsigned int* input,
     }
     __syncthreads();
 
-    const int bid = bid_s;
-    const int idx = bid * blockDim.x + threadIdx.x;
+    const unsigned int bid = bid_s;
+    const unsigned int blockIdx_x = bid / numRows;
+    const unsigned int blockIdx_y = bid % numRows;
+    const int col = blockIdx_x * SECTION_SIZE + threadIdx.x;
+    const unsigned int row = blockIdx_y;
 
-    if (idx < length)
+    const int pixel = row * numCols + col;
+
+    if (row < numRows && col < numCols)
     {
-        XY[threadIdx.x] = input[idx];
+        XY[threadIdx.x] = input[pixel];
     }
     else
     {
@@ -35,35 +55,34 @@ SinglePassKoggeStoneScan(const unsigned int* input,
     for (int stride = 1; stride < SECTION_SIZE; stride *= 2)
     {
         __syncthreads();
-        float tmp = 0;
+        unsigned int tmp = 0;
         if (threadIdx.x >= stride)
         {
-            tmp = XY[threadIdx.x] + XY[threadIdx.x - stride];
+            tmp = XY[threadIdx.x - stride];
         }
         __syncthreads();
         if (threadIdx.x >= stride)
         {
-            XY[threadIdx.x] = tmp;
+            XY[threadIdx.x] += tmp;
         }
     }
-    __syncthreads();
 
     __shared__ unsigned int previousSum;
     if (threadIdx.x == 0)
     {
-        while (bid >= 1 && atomicAdd(&flags[bid], 0) == 0)
+        while (blockIdx_x >= 1 && atomicAdd(&flags[bid], 0) == 0)
         {
         }
         previousSum = scanValue[bid];
-        scanValue[bid + 1] = XY[blockDim.x - 1] + previousSum;
+        scanValue[bid + numRows] = XY[blockDim.x - 1] + previousSum;
         __threadfence();
-        atomicAdd(&flags[bid + 1], 1);
+        atomicAdd(&flags[bid + numRows], 1);
     }
     __syncthreads();
 
-    if (idx < length)
+    if (row < numRows && col < numCols)
     {
-        output[idx] = XY[threadIdx.x] + previousSum;
+        output[pixel] = XY[threadIdx.x] + previousSum;
     }
 }
 
