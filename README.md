@@ -37,7 +37,10 @@ For example:
 
 #### Formula
 Given an input image $i(x, y)$, the integral image $I(x, y)$ is computed as:
-$$I(x,y) = i(x,y) + I(x-1,y)+I(x,y-1)-I(x-1,y-1)$$
+
+$$
+I(x,y) = i(x,y) + I(x-1,y)+I(x,y-1)-I(x-1,y-1)
+$$
 
 ## Repository Structure
 
@@ -47,7 +50,7 @@ $$I(x,y) = i(x,y) + I(x-1,y)+I(x,y-1)-I(x-1,y-1)$$
 │   ├── pycuda_test.py   # Python script using pyCUDA for invoking CUDA kernels and managing the workflow
 │   └── numba_test.py    # Python script using Numba for invoking CUDA kernels and managing the workflow
 ├── c++/
-│   ├── main.cu          # CCUDA source file containing benchmarking logic
+│   ├── main.cu          # CUDA source file containing benchmarking logic
 │   └── kernel.cu        # CUDA kernel definitions
 └── integralimage        # Script for compiling the project and running benchmarks
 ```
