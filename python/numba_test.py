@@ -39,7 +39,6 @@ def single_pass_row_wise_scan(
         XY[cuda.threadIdx.x] = input[pixel]
     else:
         XY[cuda.threadIdx.x] = 0
-    cuda.syncthreads()
 
     stride = 1
     while stride < SECTION_SIZE:

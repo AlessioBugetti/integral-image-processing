@@ -56,7 +56,6 @@ SinglePassRowWiseScan(const unsigned int* input,
     {
         XY[threadIdx.x] = 0;
     }
-    __syncthreads();
 
     for (int stride = 1; stride < SECTION_SIZE; stride *= 2)
     {
