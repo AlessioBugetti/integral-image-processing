@@ -71,7 +71,8 @@ SinglePassRowWiseScan(const unsigned int* input,
             XY[threadIdx.x] += tmp;
         }
     }
-
+    __syncthreads();
+    
     __shared__ unsigned int previousSum;
     if (threadIdx.x == 0)
     {
@@ -98,49 +99,27 @@ Transpose(const unsigned int* input,
           const unsigned int width)
 {
     __shared__ unsigned int tile[TILE_DIM][TILE_DIM + 1];
-    unsigned int blockIdx_x, blockIdx_y;
 
-    if (width == height)
-    {
-        blockIdx_y = blockIdx.x;
-        blockIdx_x = (blockIdx.x + blockIdx.y) % gridDim.x;
-    }
-    else
-    {
-        const unsigned bid = blockIdx.x + gridDim.x * blockIdx.y;
-        blockIdx_y = bid % gridDim.y;
-        blockIdx_x = ((bid / gridDim.y) + blockIdx_y) % gridDim.x;
-    }
+    unsigned int x = blockIdx.x * TILE_DIM + threadIdx.x;
+    unsigned int y = blockIdx.y * TILE_DIM + threadIdx.y;
 
-    const unsigned int xIndexIn = blockIdx_x * TILE_DIM + threadIdx.x;
-    const unsigned int yIndexIn = blockIdx_y * TILE_DIM + threadIdx.y;
-
-    if (xIndexIn < width && yIndexIn < height)
+    for (unsigned int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
     {
-        const unsigned int index_in = xIndexIn + (yIndexIn * width);
-        for (unsigned int i = 0; i < TILE_DIM; i += BLOCK_ROWS)
+        if ((x < width) && (y + j < height))
         {
-            if (yIndexIn + i < height)
-            {
-                tile[threadIdx.y + i][threadIdx.x] = input[index_in + i * width];
-            }
+            tile[threadIdx.y + j][threadIdx.x] = input[(y + j) * width + x];
         }
     }
-
     __syncthreads();
 
-    const unsigned int xIndexOut = blockIdx_y * TILE_DIM + threadIdx.x;
-    const unsigned int yIndexOut = blockIdx_x * TILE_DIM + threadIdx.y;
+    x = blockIdx.y * TILE_DIM + threadIdx.x;
+    y = blockIdx.x * TILE_DIM + threadIdx.y;
 
-    if (xIndexOut < height && yIndexOut < width)
+    for (unsigned int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
     {
-        for (unsigned int i = 0; i < TILE_DIM; i += BLOCK_ROWS)
+        if ((x < height) && (y + j < width))
         {
-            if (xIndexOut < height && threadIdx.y + i < TILE_DIM)
-            {
-                const unsigned int index_out = xIndexOut + (yIndexOut * height);
-                output[index_out + i * height] = tile[threadIdx.x][threadIdx.y + i];
-            }
+            output[(y + j) * height + x] = tile[threadIdx.x][threadIdx.y + j];
         }
     }
 }

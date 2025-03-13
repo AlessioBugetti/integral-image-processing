@@ -69,41 +69,21 @@ def single_pass_row_wise_scan(
 def transpose(input, output, height, width):
     tile = cuda.shared.array((TILE_DIM, TILE_DIM_2), dtype=types.uint32)
 
-    if width == height:
-        blockIdx_y = cuda.blockIdx.x
-        blockIdx_x = (cuda.blockIdx.x + cuda.blockIdx.y) % cuda.gridDim.x
-    else:
-        bid = cuda.blockIdx.x + cuda.gridDim.x * cuda.blockIdx.y
-        blockIdx_y = bid % cuda.gridDim.y
-        blockIdx_x = ((bid // cuda.gridDim.y) + blockIdx_y) % cuda.gridDim.x
+    x = cuda.blockIdx.x * TILE_DIM + cuda.threadIdx.x
+    y = cuda.blockIdx.y * TILE_DIM + cuda.threadIdx.y
 
-    xIndexIn = blockIdx_x * TILE_DIM + cuda.threadIdx.x
-    yIndexIn = blockIdx_y * TILE_DIM + cuda.threadIdx.y
-
-    if xIndexIn < width and yIndexIn < height:
-        index_in = xIndexIn + (yIndexIn * width)
-        i = 0
-        while i < TILE_DIM:
-            if yIndexIn + i < height:
-                tile[cuda.threadIdx.y + i][cuda.threadIdx.x] = input[
-                    index_in + i * width
-                    ]
-            i += BLOCK_ROWS
+    for j in range(0, TILE_DIM, BLOCK_ROWS):
+        if x < width and (y + j) < height:
+            tile[cuda.threadIdx.y + j][cuda.threadIdx.x] = input[(y + j) * width + x]
 
     cuda.syncthreads()
 
-    xIndexOut = blockIdx_y * TILE_DIM + cuda.threadIdx.x
-    yIndexOut = blockIdx_x * TILE_DIM + cuda.threadIdx.y
+    x = cuda.blockIdx.y * TILE_DIM + cuda.threadIdx.x
+    y = cuda.blockIdx.x * TILE_DIM + cuda.threadIdx.y
 
-    if xIndexOut < height and yIndexOut < width:
-        i = 0
-        while i < TILE_DIM:
-            if xIndexOut < height and cuda.threadIdx.y + i < TILE_DIM:
-                index_out = xIndexOut + (yIndexOut * height)
-                output[index_out + i * height] = tile[cuda.threadIdx.x][
-                    cuda.threadIdx.y + i
-                    ]
-            i += BLOCK_ROWS
+    for j in range(0, TILE_DIM, BLOCK_ROWS):
+        if x < height and (y + j) < width:
+            output[(y + j) * height + x] = tile[cuda.threadIdx.x][cuda.threadIdx.y + j]
 
 
 def numba_integral_image(host_input, width, height):
